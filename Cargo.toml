@@ -10,4 +10,3 @@ description = "The game Pong, written in lambda calculus, and a thin layer of Ru
 
 [dependencies]
 sdl2 = "0.32.2"
-lambda_calc = "2.1.0"
