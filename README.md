@@ -63,8 +63,8 @@ $ cargo run --release -- -n
 
 In a nutshell:
 
-The main program spawns lambda calculus interpreter is spawned and
-parses the definitions from a source file, and keeps waiting input.
+The main program spawns a lambda calculus interpreter process, which
+parses the definitions from a source file, and keeps waiting for input.
 The lambda calculus source must define the following symbols, which compute
 
 - `initState`: the first state;
