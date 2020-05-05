@@ -29,25 +29,18 @@ provided; it's meant for comparing both the code and the programs' performance.
 
 ### Running
 
-Clone this repository:
+First, install the `lambda_calc` interpreter with
 
 ```
-$ git clone https://gitlab.com/mcmfb/pong_lambda.git
+$ cargo install lambda_calc
 ```
 
-Then, run
+By default, cargo will install the binary to `$HOME/.cargo/bin`. Make sure
+to add that directory to the PATH environment variable, or install
+somwehere else with the `--root` option.
 
-```
-$ cargo build --release
-```
-
-This command will install the `lambda_calc` binary among the dependencies.
-Make sure to place the binary somewhere included in your `PATH` variable.
-
-The `--release` flag instructs Rust to optimize the resulting program.
-(It's slow enough with that, let alone without it...)
-
-Then, from this repository's root, run the lambda calculus pong with
+Clone this repository, then, from this repository's root,
+run the lambda calculus pong with
 
 ```
 $ cargo run --release -- -l lambda/pong.txt
@@ -58,6 +51,9 @@ And the native Rust implementation with
 ```
 $ cargo run --release -- -n
 ```
+
+The `--release` flag instructs Rust to optimize the resulting program.
+(It's slow enough with that, let alone without it...)
 
 ### How?
 
