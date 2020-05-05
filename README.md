@@ -68,24 +68,24 @@ The main program spawns lambda calculus interpreter is spawned and
 parses the definitions from a source file, and keeps waiting input.
 The lambda calculus source must define the following symbols for computing:
 
-    - `initState`: the first state;
+- `initState`: the first state;
 
-    - `nextState`: the next game state, given its current state and the user input;
+- `nextState`: the next game state, given its current state and the user input;
 
-    - `gameOver`: whether the game is over, given its state;
+- `gameOver`: whether the game is over, given its state;
 
-    - `getScreenRects`: the list of rectangles that must be rendered, given the game state.
+- `getScreenRects`: the list of rectangles that must be rendered, given the game state.
 
 The main program then begins to supply input to the lambda calculus
 interpreter process.
 At the very first frame, the first state is obtained with `initState`.
 Then, every frame,
 
-    - the next frame is computed with `nextState`;
+- the next frame is computed with `nextState`;
 
-    - it's decided whether to close the window, with `gameOver`'s result;
+- it's decided whether to close the window, with `gameOver`'s result;
 
-    - the rectangles given by `getScreenRects` are rendered.
+- the rectangles given by `getScreenRects` are rendered.
 
 The game state is simply stored and never parsed in any way. Only the lambda
 calculus functions are required to understand its representation.
@@ -98,3 +98,8 @@ while the list of rectangles is a Church list,
 where each rectangle is a 4-tuple containing the integers (x, y, w, h),
 [whose meanings can be seen here](https://wiki.libsdl.org/SDL_Rect).
 In turn, each integer uses a custom encoding.
+
+### Performance
+
+In a modern i5, the lambda calculus implementation (`-l`) takes a bit more than
+20 seconds to start, but has an ok-ish frame rate and is actually playable.
