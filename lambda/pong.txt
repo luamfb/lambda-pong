@@ -1,0 +1,680 @@
+# pong, implemented in lambda calculus (except for the GUI)
+
+################################################################################
+#                              Common definitions                              #
+################################################################################
+
+# an "identity" function that forces its argument to be evaluated.
+eval = \!x -> x
+
+# booleans
+true = \x y -> x
+false = \x y -> y
+not = \b -> b false true
+and = \p q -> p q false
+or  = \p q -> p true q
+
+# pairs
+pair = \x y z -> z x y
+first = \p -> p (\x y -> x)
+second = \p -> p (\x y -> y)
+
+# combinators
+id = \u -> u
+const = \u v -> u
+I = id
+K = const
+Y = \f -> (\x -> f (x x)) (\x -> f (x x))
+
+# lists
+#hd = first
+#tl = second
+nil = false
+isEmpty = \list -> list (\head tail nilClause -> false) true
+
+# unfortunately takes O(length of listOne) steps
+append = \listOne listTwo -> Y      &
+    (\recur l -> l                  &
+        (\head tail nilClause ->    &
+            pair head (recur tail)) &
+        listTwo)                    &
+    listOne
+
+# Evaluates the nth element of a list, starting from 0.
+# If the index is < 0 or greater than the list size, evaluates to nil.
+#
+nth = \list num -> Y                        &
+    (\recur l !n -> l                       &
+        (\head tail nilClause -> (sign n)   &
+            (recur tail (pred n))           &
+            nil                             &
+            head)                           &
+        nil)                                &
+    list num
+
+mapList = \f list -> Y                      &
+    (\recur l -> l                          &
+        (\head tail nilClause ->            &
+            pair (f head) (recur tail))     &
+        nil)                                &
+    list
+
+# Integers.
+# The encoding we use for positive numbers is somewhere between a list
+# (chained church pairs) and
+# the traditional church encoding for numbers.
+# This allows a simple implementation for the predecessor, which takes
+# O(1) reduction steps, while keeping a simple implementation for the successor
+# function.
+# Further, the way the predecessor function works also allows us to deal with
+# negative numbers, though with some caveats; see below.
+#
+# To the best of my knowledge, I'm the first one to derive this encoding, and
+# therefore I get to name it too. Since the positive numbers are made of Chained
+# Lambdas and the negative ones, of Nested redexes with the Identity function,
+# it makes sense to call it CLNI (or Chalaneid, if you want a more exotic name).
+#
+
+zero = \x -> x
+succ = \n x -> n (\u -> u x)
+pred = \n x -> (n x (\u -> u))
+
+one     = succ zero
+two     = succ one
+three   = succ two
+four    = succ three
+five    = succ four
+six     = succ five
+seven   = succ six
+eight   = succ seven
+nine    = succ eight
+ten     = succ nine
+
+minusOne    = pred zero
+minusTwo    = pred minusOne
+minusThree  = pred minusTwo
+minusFour   = pred minusThree
+minusFive   = pred minusFour
+minusSix    = pred minusFive
+minusSeven  = pred minusSix
+minusEight  = pred minusSeven
+minusNine   = pred minusEight
+minusTen    = pred minusNine
+
+# This is just a generalization of true and false with 3 branches.
+posSign  = \x y z -> x
+negSign  = \x y z -> y
+zeroSign = \x y z -> z
+
+# Extract the sign of a number.
+# This unfortunately takes O(n) steps on negative numbers, but, due to their
+# nature, I don't think anything can be done about it.
+#
+sign = \n -> n (\x y -> y) (\u v w -> w) (\a b -> zeroSign) (\a -> posSign) negSign
+
+#isPositive  = \n -> (sign n) true false false
+#isNegative  = \n -> (sign n) false true false
+
+# Rather than using sign directly, I've made these based off of sign.
+# This also means less reduction steps.
+
+isPositive  = \n -> n (\x -> x)   (\a b -> b) (\z x y -> x) (\x y -> y)
+isNegative  = \n -> n (\x y -> y) (\a b -> b) (\z x y -> y) (\x y -> x)
+
+# I can't make this one any better.
+isZero      = \n -> (sign n) false false true
+
+# Note: just using "\m n x -> m (n x)" wouldn't be commutative:
+#
+#   > (\m n x -> m (n x)) minusTwo two
+#   = (λx. x)
+#   > (\m n x -> m (n x)) two minusTwo
+#   = (λx u. u (λu1. u1 (x (λu2. u2) (λu3. u3))))
+#
+# So when there first argument is positive and the second is negative we must
+# swap them.
+#
+#add = \m n x -> (and (isPositive m) (isNegative n)) (n (m x)) (m (n x))
+#
+# ... but it's not wrong to swap the arguments every time the second one is
+# negative. This means less reductions.
+#
+add = \m n x -> (isNegative n) (n (m x)) (m (n x))
+
+# invert the signal of a number.
+minus = \n -> applyNTimes n zero pred succ
+
+# if m > 0, compute f (f ... (f n) ...) with m f's.
+# if m < 0, compute g (g ... (g n) ...) with abs(m) g's.
+#
+# In other words, this converts a number in our encoding to Church encoding,
+# using the sign to choose between two functions that may be applied.
+#
+applyNTimes = \m n f g ->   &
+    Y (\r !a b -> (sign a)  &
+        (r (pred a) (f b))  &
+        (r (succ a) (g b))  &
+        b                   &
+    ) m n
+
+sub = \m n -> add m (minus n)
+
+# Three-way comparison.
+#
+#cmp = \m n -> sign (sub m n)
+#
+greaterThan = posSign
+lesserThan = negSign
+equalTo = zeroSign
+
+cmp = \m n ->                                  &
+   (Y (\recur !a !b -> (sign a)                &
+           ((isPositive b)                     &
+                   (recur (pred a) (pred b))   &
+                   greaterThan)                &
+           ((isNegative b)                     &
+                   (recur (succ a) (succ b))   &
+                   lesserThan)                 &
+           ((sign b)                           &
+                   lesserThan                  &
+                   greaterThan                 &
+                   equalTo))                   &
+       m n)
+
+# Two-way comparisons, implemented in terms of the three-way one.
+#
+lt = \m n -> (cmp m n) false true false
+gt = \m n -> (cmp m n) true false false
+eq = \m n -> (cmp m n) false false true
+leq = \m n -> (cmp m n) false true true
+geq = \m n -> (cmp m n) true false true
+
+mul = \m n -> applyNTimes m zero (add n) (add (minus n))
+square = \x -> mul x x
+
+# Integer division.
+# divPos is a function and divide two strictly positive numbers.
+# This function gives one when dividing by zero, arbitrarily.
+#
+div = \m n -> (sign m)                  &
+    ((sign n)                           &
+        (divPos m n)                    &
+        (minus (divPos m (minus n)))    &
+        one)                            &
+    ((sign n)                           &
+        (minus (divPos (minus m) n))    &
+        (divPos (minus m) (minus n))    &
+        one)                            &
+    zero
+
+# This function may loop indefinitely if given any non-positive arguments.
+#
+divPos = \!m !n -> actualDivPos m n zero
+
+actualDivPos = \a b quot ->                     &
+    Y (\recur !m !n !q ->                       &
+        (\!diff -> (isNegative diff)            &
+            q                                   &
+            (recur diff n (succ q)))            &
+        ((\!minusN -> add m minusN) (minus n))  &
+    ) a b quot
+
+# Another implementation of division; takes way too many reductions.
+
+# compute the list of all powers of ten smaller than x.
+#powersOfTenNotGreater = \num ->                &
+#   Y (\recur !x !pow !list ->                  &
+#       (gt pow x)                              &
+#       list                                    &
+#       (recur x (mul pow ten) (pair pow list)) &
+#   ) num one nil
+
+# subtract subFrom from num as many times as possible while keeping the result
+# positive, incrementing acc by addBy each time, returning the pair (num, acc)
+# after this.
+# This function assumes num > 0 on the first call.
+#
+#subAcc = \num acc addBy subFrom ->             &
+#   Y (\recur !x !a ->                          &
+#       (lt x subFrom)                          &
+#       (pair a x)                              &
+#       (recur (sub x subFrom) (add a addBy))   &
+#   ) num acc
+
+#divPos = \a b ->                                                           &
+#   Y (\recur !l !p ->                                                      &
+#       l (\h t d ->  recur t (subAcc (second p) (first p) h (mul b h)))    &
+#       (first p)                                                           &
+#   ) (powersOfTenNotGreater a) (pair zero a)
+
+################################################################################
+#                              Pong-related stuff                              #
+################################################################################
+
+# A quadruple representing a rectangle such that its width is w, its height is h,
+# and (x,y) are the coordinates of the upper-left corner.
+#
+newRect     = \!x !y !w !h f -> f x y w h
+getX        = \x y w h -> x
+getY        = \x y w h -> y
+getWidth    = \x y w h -> w
+getHeight   = \x y w h -> h
+getTop      = getY
+getBot      = \x y w h -> add y h
+
+rectCenterY = \x y w h -> add y (div h two)
+
+# led dimensions
+ledLargerDim = six
+ledSmallerDim = two
+
+# again, according to the seven-segment LED panel scheme:
+#   A
+# F   B
+#   G
+# E   C
+#   D
+#
+# All the coordinates are relative; they must be added the correct x offset.
+#
+ledA = newRect              &
+    (eval zero)             &
+    (eval zero)             &
+    (eval ledLargerDim)     &
+    (eval ledSmallerDim)
+
+ledB = newRect                          &
+    (sub ledLargerDim ledSmallerDim)    &
+    (eval zero)                         &
+    (eval ledSmallerDim)                &
+    (eval ledLargerDim)
+
+ledC = newRect                          &
+    (sub ledLargerDim ledSmallerDim)    &
+    (eval ledLargerDim)                 &
+    (eval ledSmallerDim)                &
+    (eval ledLargerDim)
+
+ledD = newRect              &
+    (eval zero)             &
+    (mul two ledLargerDim)  &
+    (eval ledLargerDim)     &
+    (eval ledSmallerDim)
+
+ledE = newRect              &
+    (eval zero)             &
+    (eval ledLargerDim)     &
+    (eval ledSmallerDim)    &
+    (eval ledLargerDim)     &
+
+ledF = newRect              &
+    (eval zero)             &
+    (eval zero)             &
+    (eval ledSmallerDim)    &
+    (eval ledLargerDim)
+
+ledG = newRect              &
+    (eval zero)             &
+    (eval ledLargerDim)     &
+    (eval ledLargerDim)     &
+    (eval ledSmallerDim)
+
+# LED rectangles corresponding to each number, from 0 through 9.
+#
+zeroLed =                                           &
+    (pair (eval ledA)                               &
+        (pair (eval ledB)                           &
+            (pair (eval ledC)                       &
+                (pair (eval ledD)                   &
+                    (pair (eval ledE)               &
+                        (pair (eval ledF) nil))))))
+
+oneLed =                        &
+    (pair (eval ledB)           &
+        (pair (eval ledC) nil))
+
+twoLed =                                        &
+    (pair (eval ledA)                           &
+        (pair (eval ledB)                       &
+            (pair (eval ledD)                   &
+                (pair (eval ledE)               &
+                    (pair (eval ledG) nil)))))
+
+threeLed =                                      &
+    (pair (eval ledA)                           &
+        (pair (eval ledB)                       &
+            (pair (eval ledC)                   &
+                (pair (eval ledD)               &
+                    (pair (eval ledG) nil)))))
+
+fourLed =                                   &
+    (pair (eval ledB)                       &
+        (pair (eval ledC)                   &
+            (pair (eval ledF)               &
+                (pair (eval ledG) nil))))
+
+fiveLed =                                       &
+    (pair (eval ledA)                           &
+        (pair (eval ledC)                       &
+            (pair (eval ledD)                   &
+                (pair (eval ledF)               &
+                    (pair (eval ledG) nil)))))
+
+sixLed =                                            &
+    (pair (eval ledA)                               &
+        (pair (eval ledC)                           &
+            (pair (eval ledD)                       &
+                (pair (eval ledE)                   &
+                    (pair (eval ledF)               &
+                        (pair (eval ledG) nil))))))
+
+sevenLed =                              &
+    (pair (eval ledA)                   &
+        (pair (eval ledB)               &
+            (pair (eval ledC) nil)))
+
+eightLed =                                                  &
+    (pair (eval ledA)                                       &
+        (pair (eval ledB)                                   &
+            (pair (eval ledC)                               &
+                (pair (eval ledD)                           &
+                    (pair (eval ledE)                       &
+                        (pair (eval ledF)                   &
+                            (pair (eval ledG) nil)))))))
+
+nineLed =                                               &
+    (pair (eval ledA)                                   &
+        (pair (eval ledB)                               &
+            (pair (eval ledC)                           &
+                (pair (eval ledD)                       &
+                    (pair (eval ledF)                   &
+                        (pair (eval ledG) nil))))))
+
+# list of led rectangles by number.
+ledNumList =                                                                &
+    (pair (eval zeroLed)                                                    &
+        (pair (eval oneLed)                                                 &
+            (pair (eval twoLed)                                             &
+                (pair (eval threeLed)                                       &
+                    (pair (eval fourLed)                                    &
+                        (pair (eval fiveLed)                                &
+                            (pair (eval sixLed)                             &
+                                (pair (eval sevenLed)                       &
+                                    (pair (eval eightLed)                   &
+                                        (pair (eval nineLed) nil))))))))))
+
+# for convenience.
+getPlayerLedNum = \!n -> nth playerLedNumList n
+getCpuLedNum = \!n -> nth cpuLedNumList n
+
+# directions
+ne = \a b c d -> a
+nw = \a b c d -> b
+sw = \a b c d -> c
+se = \a b c d -> d
+
+# Concatenate two tuples, e.g. (\f -> f a b c) and (\g -> d e) to yield
+# (\fn -> fn a b c d e)
+#
+concat = \firstTuple secondTuple fn -> secondTuple (firstTuple fn)
+
+# Instead of defining e.g. barHeight as screenHeight / 10, we define
+# the other way around for the sake of speed.
+# Note that all dimensions are dowscaled by scalingFactor.
+
+stepSize = four
+
+halfBarWidth    = one 
+barWidth        = mul halfBarWidth two
+
+halfBarHeight   = eight
+barHeight       = mul halfBarHeight two
+
+# 1/10 of screenWidth
+screenWidthTenth = square four
+
+playerXCenter   = mul four screenWidthTenth
+cpuXCenter      = minus playerXCenter
+
+playerXLeft     = sub playerXCenter halfBarWidth
+playerXRight    = add playerXCenter halfBarWidth
+cpuXLeft        = sub cpuXCenter    halfBarWidth
+cpuXRight       = add cpuXCenter    halfBarWidth
+
+halfScreenWidth  = mul five screenWidthTenth
+screenWidth      = mul halfScreenWidth two
+# defined this way because "minus halfScreenWidth" takes too long
+minusHalfScreenWidth = mul minusFive screenWidthTenth
+
+screenHeightTenth   = mul two six
+halfScreenHeight    = mul five screenHeightTenth
+screenHeight        = mul halfScreenHeight two
+
+ballSize = one
+
+maxY = halfScreenHeight
+minY = minus maxY
+
+# Since the Y coordinate of a rectangle is that of its upper-left corner,
+# we must subtract barHeight in maxRectY, but not in minRectY.
+#
+maxRectY = sub (sub maxY barHeight) ballSize
+minRectY = add minY ballSize
+
+# apply the X and Y offsets to all led rectangles.
+# (rectListList is a list of lists of rectangles.)
+#
+applyOffsetRects = \rectListList !xoff !yoff -> &
+    mapList                                     &
+    (\list -> mapList                           &
+        (\rect -> rect                          &
+            (\x y w h -> newRect                &
+                (add x xoff)                    &
+                (add y yoff)                    &
+                w                               &
+                h))                             &
+        list)                                   &
+    rectListList
+
+cpuXLedOffset      = sub halfScreenWidth ledLargerDim
+playerXLedOffset   = minusHalfScreenWidth
+ 
+cpuLedNumList    = applyOffsetRects ledNumList cpuXLedOffset    minY
+playerLedNumList = applyOffsetRects ledNumList playerXLedOffset minY
+
+# Our state is a tuple whose elements and order can be easily deduced by the
+# following functions:
+#
+getPlayerRect   = \a b c d e f g -> a
+getCpuRect      = \a b c d e f g -> b
+getPlayerScore  = \a b c d e f g -> c
+getCpuScore     = \a b c d e f g -> d
+getBallRect     = \a b c d e f g -> e
+getBallDir      = \a b c d e f g -> f
+getBallAccel    = \a b c d e f g -> g
+
+playerInitRect = newRect    &
+    (eval playerXLeft)      &
+    (eval zero)             &
+    (eval barWidth)         &
+    (eval barHeight)
+
+cpuInitRect = newRect   &
+    (eval cpuXLeft)     &
+    (eval zero)         &
+    (eval barWidth)     &
+    (eval barHeight)
+
+ballInitRect = newRect  &
+    (eval zero)         &
+    (eval zero)         &
+    (eval ballSize)     &
+    (eval ballSize)
+
+# evaluates to a new (x, y) pair.
+moveBallCoords = \dir accel !x !y -> dir  &
+    (pair (add x accel) (sub y accel))    &
+    (pair (sub x accel) (sub y accel))    &
+    (pair (sub x accel) (add y accel))    &
+    (pair (add x accel) (add y accel))
+
+# evaluates to a new dir.
+reflectScreenCorners = \!dir !y !ballHeight !accel ->   &
+    (leq y (add minY accel)) (dir se sw sw se)          &
+    ((gt y (sub (sub maxY ballHeight) accel))           &
+        (dir ne nw nw ne)                               &
+        dir)
+
+ballHitPlayer = \x y ballWidth playerTop playerBot ->       &
+    (and                                                    &
+        (geq (add x ballWidth) playerXLeft)                 &
+        (and                                                &
+            (geq y playerTop)                               &
+            (leq y playerBot)))
+
+ballHitCpu = \x y cpuTop cpuBot ->      &
+    (and                                &
+        (leq x cpuXRight)               &
+        (and                            &
+            (geq y cpuTop)              &
+            (leq y cpuBot)))
+
+# evaluates to a new (direction, acceleration) pair.
+reflectHitBar =                                                             &
+\!x !y !dir !accel !ballWidth !playerTop !playerBot !cpuTop !cpuBot ->      &
+    (ballHitPlayer x y ballWidth playerTop playerBot)                       &
+        (pair (dir nw sw nw sw) (succ accel))                               &
+        ((ballHitCpu x y cpuTop cpuBot)                                     &
+            (pair (dir se ne se ne) (succ accel))                           &
+            (pair dir accel))
+
+nextPlayerRect = \rect input ->     &
+    rect                            &
+    (\x y w h -> newRect            &
+        x                           &
+        (input                      &
+            ((geq y minRectY)       &
+                (sub y stepSize)    &
+                y)                  &
+            ((leq y maxRectY)       &
+                (add y stepSize)    &
+                y)                  &
+            y)                      &
+        w                           &
+        h)
+
+nextCpuRect = \rect !ballCenterY ->                 &
+    rect                                            &
+    (\x y w h -> newRect                            &
+        x                                           &
+        ((cmp (add y (div h two)) ballCenterY)      &
+            ((gt y minRectY) (sub y stepSize) y)    &
+            ((leq y maxRectY) (add y stepSize) y)   &
+            y)                                      &
+        w                                           &
+        h)
+
+playerHasScored = \ballRect -> geq (ballRect getX) halfScreenWidth
+cpuHasScored    = \ballRect -> leq (ballRect getX) minusHalfScreenWidth
+
+moveBallRect = \ballRect dir accel ->                               &
+    (concat                                                         &
+        (moveBallCoords dir accel (ballRect getX) (ballRect getY))  &
+        (\f -> f (ballRect getWidth) (ballRect getHeight)))         &
+
+# Evaluates to a new tuple with both scores and ball rectangle, direction and
+# acceleration
+#
+moveBallAndResetIfScored = \!playerScore !cpuScore ballRect dir accel ->    &
+    ((\!newBallRect ->                                                      &
+        (playerHasScored newBallRect)                                       &
+        (\f -> f                                                            &
+            (succ playerScore)                                              &
+            cpuScore                                                        &
+            (initState getBallRect)                                         &
+            (initState getBallDir)                                          &
+            (initState getBallAccel))                                       &
+        ((cpuHasScored newBallRect)                                         &
+            (\f -> f                                                        &
+                playerScore                                                 &
+                (succ cpuScore)                                             &
+                (initState getBallRect)                                     &
+                (initState getBallDir)                                      &
+                (initState getBallAccel))                                   &
+            (\f -> f playerScore cpuScore newBallRect dir accel)))          &
+    (moveBallRect ballRect dir accel))
+
+# Evaluates to a (direction, acceleration) pair.
+reflectBall = \playerRect cpuRect ballRect dir accel ->         &
+    (reflectHitBar                                              &
+            (ballRect getX)                                     &
+            (ballRect getY)                                     &
+            (reflectScreenCorners                               &
+                dir (ballRect getY) (ballRect getHeight) accel) &
+            accel                                               &
+            (ballRect getWidth)                                 &
+            (playerRect getTop)                                 &
+            (playerRect getBot)                                 &
+            (cpuRect getTop)                                    &
+            (cpuRect getBot))
+
+################################################################################
+#                                Needed symbols                                #
+################################################################################
+
+# the value by which all dimensions are downscaled (divided).
+scalingFactor = five
+
+# dimension offsets
+xOffset = mul scalingFactor halfScreenWidth
+yOffset = mul scalingFactor halfScreenHeight
+
+# user inputs.
+up      = \a b c -> a
+down    = \a b c -> b
+none    = \a b c -> c
+
+# evaluates the game's initial state.
+initState = \f -> f                 &
+    (eval playerInitRect)           &
+    (eval cpuInitRect)              &
+    (eval zero)                     &
+    (eval zero)                     &
+    (eval ballInitRect)             &
+    (eval se)                       &
+    (eval one)
+
+# receives a state and evaluates a boolean.
+gameOver = \!state -> or (gt (state getPlayerScore) nine) (gt (state getCpuScore) nine)
+
+# receives the current state and the user's input and evaluates the next state.
+nextState = \!state input -> state                                          &
+    (\!playerRect !cpuRect !playerScore !cpuScore !ballRect !dir !accel ->  &
+        (\z -> z                                                            &
+            (nextPlayerRect playerRect input)                               &
+            (nextCpuRect cpuRect (ballRect rectCenterY)))                   &
+        (\!newPlayerRect !newCpuRect ->                                     &
+            ((moveBallAndResetIfScored playerScore cpuScore ballRect dir accel) &
+                (\!newPlayerScore !newCpuScore !newBallRect !newDir !newAccel-> &
+                    (concat                                                 &
+                        (\f -> f                                            &
+                            newPlayerRect                                   &
+                            newCpuRect                                      &
+                            newPlayerScore                                  &
+                            newCpuScore                                     &
+                            newBallRect)                                    &
+                        (reflectBall                                        &
+                            newPlayerRect                                   &
+                            newCpuRect                                      &
+                            newBallRect                                     &
+                            newDir                                          &
+                            newAccel))))))                                  &
+
+# receives a state and evaluates a list of rectangles that must be rendered.
+getScreenRects = \!state ->                                         &
+    (pair (state getPlayerRect)                                     &
+        (pair (state getCpuRect)                                    &
+            (pair (state getBallRect)                               &
+                (append                                             &
+                    (eval (getPlayerLedNum (state getPlayerScore))) &
+                    (eval (getCpuLedNum (state getCpuScore)))))))
