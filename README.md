@@ -25,8 +25,7 @@ Second, lambda calculus can, given a state, compute the next one, but
 is necessary for the game to work.
 
 Also, you'll notice that a native Rust implementation of Pong has also been
-provided, meant which is meant for comparing both the code and the programs'
-performance.
+provided; it's meant for comparing both the code and the programs' performance.
 
 ### Running
 
@@ -66,7 +65,7 @@ In a nutshell:
 
 The main program spawns lambda calculus interpreter is spawned and
 parses the definitions from a source file, and keeps waiting input.
-The lambda calculus source must define the following symbols for computing:
+The lambda calculus source must define the following symbols, which compute
 
 - `initState`: the first state;
 
@@ -81,13 +80,13 @@ interpreter process.
 At the very first frame, the first state is obtained with `initState`.
 Then, every frame,
 
-- the next frame is computed with `nextState`;
+- the next state is computed with `nextState`;
 
 - it's decided whether to close the window, with `gameOver`'s result;
 
 - the rectangles given by `getScreenRects` are rendered.
 
-The game state is simply stored and never parsed in any way. Only the lambda
+The game state is simply stored and never parsed in any way; only the lambda
 calculus functions are required to understand its representation.
 
 However, the results of `gameOver` and `getScreenRects` must be parsed,
