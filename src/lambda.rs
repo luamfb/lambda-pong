@@ -57,7 +57,8 @@ impl State {
             .spawn();
         let mut lambda_proc = match lambda_proc {
             Ok(p) => p,
-            Err(e) => return Err(format!("failed to spawn lambda interpreter process: '{}'", e)),
+            Err(e) => return Err(format!("failed to spawn lambda interpreter process: '{}'.
+Make sure the 'lambda_calc' binary is installed in a directory included in your PATH.", e)),
         };
 
         let in_stream_unwrapped = match lambda_proc.stdin {

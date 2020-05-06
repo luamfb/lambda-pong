@@ -29,18 +29,30 @@ provided; it's meant for comparing both the code and the programs' performance.
 
 ### Running
 
-First, install the `lambda_calc` interpreter with
+First and foremost,
+[install `cargo`](https://doc.rust-lang.org/cargo/getting-started/installation.html)
+if you don't have it.
+
+Then, install the `lambda_calc` interpreter with
 
 ```
 $ cargo install lambda_calc
 ```
 
-By default, cargo will install the binary to `$HOME/.cargo/bin`. Make sure
-to add that directory to the PATH environment variable, or install
-somwehere else with the `--root` option.
+By default, cargo will install the binary to `$HOME/.cargo/bin`. Make sure to
+[add that directory to your `PATH`](https://opensource.com/article/17/6/set-path-linux)
+environment variable, or install somewhere included in your `PATH`, using the
+`--root` option (run `man cargo-install` for details).
 
-Clone this repository, then, from this repository's root,
-run the lambda calculus pong with
+Then, install [SDL2](https://www.libsdl.org/download-2.0.php)
+if you don't have it already. On Debian-based systems, simply run
+
+```
+$ sudo apt install libsdl2-2.0-0 libsdl2-dev
+```
+
+Clone this repository and go to its root.
+From there, run the lambda calculus pong with
 
 ```
 $ cargo run --release -- -l lambda/pong.txt
